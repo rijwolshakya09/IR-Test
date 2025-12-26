@@ -1190,114 +1190,121 @@ class _ClassificationScreenState extends State<ClassificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Document Classification',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Classify text into politics, business, or health.',
-              style: TextStyle(color: Color(0xFF6B7280)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _textController,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: 'Enter text to classify',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
+    return Container(
+      height: MediaQuery.of(context).size.height,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: Column(
             children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _modelType,
-                  decoration: const InputDecoration(labelText: 'Model'),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'naive_bayes', child: Text('Naive Bayes')),
-                    DropdownMenuItem(
-                        value: 'logistic_regression',
-                        child: Text('Logistic Regression')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _modelType = value ?? 'naive_bayes');
-                    _loadModelInfo();
-                  },
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Document Classification',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: _training ? null : _trainModels,
-                child:
-                    _training ? const Text('Training...') : const Text('Train'),
+              const SizedBox(height: 6),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Classify text into politics, business, or health.',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
               ),
-            ],
-          ),
-          if (_modelInfo != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Wrap(
-                spacing: 8,
+              const SizedBox(height: 12),
+              TextField(
+                controller: _textController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Enter text to classify',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
                 children: [
-                  Chip(label: Text('Docs: ${_modelInfo!.totalDocuments}')),
-                  Chip(label: Text('Trained: ${_modelInfo!.isTrained}')),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _modelType,
+                      decoration: const InputDecoration(labelText: 'Model'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'naive_bayes', child: Text('Naive Bayes')),
+                        DropdownMenuItem(
+                            value: 'logistic_regression',
+                            child: Text('Logistic Regression')),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _modelType = value ?? 'naive_bayes');
+                        _loadModelInfo();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _training ? null : _trainModels,
+                    child: _training
+                        ? const Text('Training...')
+                        : const Text('Train'),
+                  ),
                 ],
               ),
-            ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: _loading ? null : _classify,
-            icon: const Icon(Icons.analytics),
-            label: const Text('Classify'),
-          ),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: LinearProgressIndicator(),
-            ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
-            ),
-          if (_result != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Card(
-                child: ListTile(
-                  title: Text('Prediction: ${_result!.predictedCategory}'),
-                  subtitle: Text(
-                    'Confidence: ${(_result!.confidence * 100).toStringAsFixed(1)}%\n${_result!.explanation}',
+              if (_modelInfo != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      Chip(label: Text('Docs: ${_modelInfo!.totalDocuments}')),
+                      Chip(label: Text('Trained: ${_modelInfo!.isTrained}')),
+                    ],
                   ),
                 ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _loading ? null : _classify,
+                icon: const Icon(Icons.analytics),
+                label: const Text('Classify'),
               ),
-            ),
-          if (_result != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Wrap(
-                spacing: 8,
-                children: _result!.probabilities.entries
-                    .map((e) => Chip(
-                        label: Text(
-                            '${e.key}: ${(e.value * 100).toStringAsFixed(1)}%')))
-                    .toList(),
-              ),
-            ),
-        ],
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: LinearProgressIndicator(),
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child:
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                ),
+              if (_result != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Card(
+                    child: ListTile(
+                      title: Text('Prediction: ${_result!.predictedCategory}'),
+                      subtitle: Text(
+                        'Confidence: ${(_result!.confidence * 100).toStringAsFixed(1)}%\n${_result!.explanation}',
+                      ),
+                    ),
+                  ),
+                ),
+              if (_result != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(
+                    spacing: 8,
+                    children: _result!.probabilities.entries
+                        .map((e) => Chip(
+                            label: Text(
+                                '${e.key}: ${(e.value * 100).toStringAsFixed(1)}%')))
+                        .toList(),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
