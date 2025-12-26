@@ -1,0 +1,14 @@
+{
+  "elapsed": 558.1284098625183,
+  "processed": 770,
+  "success": 770,
+  "errors": 0,
+  "success_rate": 100.0,
+  "items_per_second": 1.3895963898467962,
+  "estimated_remaining": 0,
+  "total_time": 435.74991846084595,
+  "total_records": 770,
+  "fast_mode": false,
+  "workers": 12,
+  "delay": 0.15
+}

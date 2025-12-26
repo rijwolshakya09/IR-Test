@@ -1,0 +1,25 @@
+# Python
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/.env*.local
+
+# IDE
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache and temporary files
+*.tmp
+*.temp
