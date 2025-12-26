@@ -10,6 +10,7 @@ const String kApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://10.0.2.2:8000',
 );
+const Color kBrandColor = Color(0xFF88CFFF);
 
 void main() {
   runApp(const IRApp());
@@ -23,8 +24,9 @@ class IRApp extends StatelessWidget {
     return MaterialApp(
       title: 'IR Rijwol Shakya',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(seedColor: kBrandColor),
         scaffoldBackgroundColor: const Color(0xFFF6F7FB),
+        fontFamily: 'Poppins',
         cardTheme: const CardThemeData(
           elevation: 1.5,
           color: Colors.white,
@@ -230,14 +232,14 @@ class _SplashLogo extends StatelessWidget {
             height: 250,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEEF2FF), Color(0xFF88CFFF)],
+                colors: [Color(0xFFEEF2FF), kBrandColor],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(120),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF88CFFF).withOpacity(glow.value * 0.35),
+                  color: kBrandColor.withOpacity(glow.value * 0.35),
                   blurRadius: 28,
                   spreadRadius: 2,
                   offset: const Offset(0, 10),
@@ -383,10 +385,10 @@ class _ShimmerRingPainter extends CustomPainter {
     final sweep = SweepGradient(
       startAngle: 0,
       endAngle: 6.28318,
-      colors: const [
-        Color(0x0088CFFF),
-        Color(0xFF88CFFF),
-        Color(0x0088CFFF),
+      colors: [
+        kBrandColor.withOpacity(0.0),
+        kBrandColor,
+        kBrandColor.withOpacity(0.0),
       ],
       stops: const [0.2, 0.5, 0.8],
       transform: GradientRotation(t * 6.28318),
@@ -422,7 +424,7 @@ class _ParticleDotsPainter extends CustomPainter {
         center.dy + radius * 0.75 * math.cos(a),
       );
       final paint = Paint()
-        ..color = i == 0 ? const Color(0xFF88CFFF) : const Color(0xFF06B6D4)
+        ..color = i == 0 ? kBrandColor : const Color(0xFF06B6D4)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(p, 4, paint);
     }
