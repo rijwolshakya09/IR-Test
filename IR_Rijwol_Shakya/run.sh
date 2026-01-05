@@ -27,12 +27,14 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 MOBILE_DIR="$ROOT_DIR/mobile"
+WEB_DIR="$ROOT_DIR/flutter_web"
 CRAWLER_DIR="$ROOT_DIR/crawler"
 VENV_DIR="$ROOT_DIR/.venv"
 REQUIREMENTS_FILE="$BACKEND_DIR/requirements.txt"
 PID_DIR="$ROOT_DIR/.pids"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FLUTTER_PID_FILE="$PID_DIR/flutter.pid"
+WEB_PID_FILE="$PID_DIR/flutter_web.pid"
 SCHEDULER_PID_FILE="$PID_DIR/scheduler.pid"
 
 mkdir -p "$PID_DIR"
@@ -154,12 +156,39 @@ else
     echo "Skipping Flutter (set START_FLUTTER=1 to enable)."
 fi
 
+# Start Flutter web app (optional)
+START_WEB="${START_WEB:-0}"
+WEB_DEVICE="${WEB_DEVICE:-chrome}"
+WEB_API_BASE_URL="${WEB_API_BASE_URL:-http://localhost:8000}"
+
+if [ "$START_WEB" = "1" ]; then
+    if [ -d "$WEB_DIR" ]; then
+        if [ -f "$WEB_PID_FILE" ] && kill -0 "$(cat "$WEB_PID_FILE")" 2>/dev/null; then
+            echo "Flutter web already running (PID $(cat "$WEB_PID_FILE"))."
+        else
+            echo "Starting Flutter web app..."
+            cd "$WEB_DIR"
+            flutter pub get
+            nohup flutter run -d "$WEB_DEVICE" --dart-define=API_BASE_URL="$WEB_API_BASE_URL" > "$ROOT_DIR/flutter_web.log" 2>&1 &
+            echo "$!" > "$WEB_PID_FILE"
+            cd - >/dev/null
+        fi
+    else
+        echo "Warning: $WEB_DIR not found. Skipping Flutter web."
+    fi
+else
+    echo "Skipping Flutter web (set START_WEB=1 to enable)."
+fi
+
 echo "Backend PID: $(cat "$BACKEND_PID_FILE") (logs: backend.log)"
 if [ -f "$SCHEDULER_PID_FILE" ]; then
     echo "Scheduler PID: $(cat "$SCHEDULER_PID_FILE") (logs: crawler_scheduler.log)"
 fi
 if [ -f "$FLUTTER_PID_FILE" ]; then
     echo "Flutter PID: $(cat "$FLUTTER_PID_FILE") (logs: flutter.log)"
+fi
+if [ -f "$WEB_PID_FILE" ]; then
+    echo "Flutter web PID: $(cat "$WEB_PID_FILE") (logs: flutter_web.log)"
 fi
 
 echo "Backend: http://localhost:8000"

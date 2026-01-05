@@ -1,0 +1,9 @@
+{
+  "name": "IR Rijwol Shakya Web",
+  "short_name": "IR Web",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F4F4F2",
+  "theme_color": "#1F2937",
+  "description": "Search and classify research publications"
+}

@@ -49,6 +49,24 @@ You can also override at runtime:
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
+## Flutter web app
+1) Install Flutter SDK and run:
+
+```bash
+cd IR_Rijwol_Shakya/flutter_web
+flutter pub get
+flutter run -d chrome
+```
+
+2) API base URL is set in `flutter_web/lib/main.dart` (default localhost):
+- Web (local backend): `http://localhost:8000`
+
+You can also override at runtime:
+
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000
+```
+
 ## Crawler
 Crawler uses Playwright with a persistent profile to pass captcha:
 

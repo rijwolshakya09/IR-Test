@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_DIR="$ROOT_DIR/.pids"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FLUTTER_PID_FILE="$PID_DIR/flutter.pid"
+WEB_PID_FILE="$PID_DIR/flutter_web.pid"
 SCHEDULER_PID_FILE="$PID_DIR/scheduler.pid"
 
 kill_if_running() {
@@ -23,6 +24,7 @@ kill_if_running() {
 
 kill_if_running "$SCHEDULER_PID_FILE" "crawler scheduler"
 kill_if_running "$FLUTTER_PID_FILE" "flutter"
+kill_if_running "$WEB_PID_FILE" "flutter web"
 kill_if_running "$BACKEND_PID_FILE" "backend (uvicorn)"
 
 # Fallbacks
