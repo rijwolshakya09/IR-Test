@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 DEFAULT_PORTAL_ROOT = os.getenv("PORTAL_ROOT", "https://pureportal.coventry.ac.uk")
 DEFAULT_BASE_URL = os.getenv(
     "BASE_URL",
-    f"{DEFAULT_PORTAL_ROOT}/en/organisations/fbl-school-of-economics-finance-and-accounting/publications/",
+    f"{DEFAULT_PORTAL_ROOT}/en/organisations/ics-research-centre-for-computational-science-and-mathematical-modelling/publications/",
 )
 PERSONS_PREFIX = "/en/persons/"
 

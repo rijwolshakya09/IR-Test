@@ -4,32 +4,54 @@ set -euo pipefail
 
 # Prefer a modern Python; backend requirements need Python >= 3.10
 PYTHON_BIN="${PYTHON_BIN:-}"
+PYTHON_CMD=()
 if [ -z "${PYTHON_BIN:-}" ]; then
-    for candidate in python3.12 python3.11 python3.10 python3; do
-        if command -v "$candidate" >/dev/null 2>&1; then
-            PYTHON_BIN="$candidate"
-            break
-        fi
-    done
+    if command -v py >/dev/null 2>&1; then
+        PYTHON_CMD=(py -3)
+    else
+        for candidate in python3.12 python3.11 python3.10 python3 python; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+                PYTHON_CMD=("$candidate")
+                break
+            fi
+        done
+    fi
+else
+    PYTHON_CMD=("$PYTHON_BIN")
 fi
 
-if [ -z "${PYTHON_BIN:-}" ]; then
+if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
     echo "Error: Python 3 is not installed (need Python >= 3.10)." >&2
     exit 1
 fi
 
-PY_OK="$($PYTHON_BIN -c 'import sys; print(int(sys.version_info >= (3,10)))' 2>/dev/null || echo 0)"
+PY_OK="$("${PYTHON_CMD[@]}" -c 'import sys; print(int(sys.version_info >= (3,10)))' 2>/dev/null || echo 0)"
 if [ "$PY_OK" != "1" ]; then
-    echo "Error: backend dependencies require Python >= 3.10 (found: $($PYTHON_BIN -V 2>&1))." >&2
+    echo "Error: backend dependencies require Python >= 3.10 (found: $("${PYTHON_CMD[@]}" -V 2>&1))." >&2
     exit 1
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UNAME_OUT="$(uname -s 2>/dev/null || echo "")"
+IS_WINDOWS=0
+case "$UNAME_OUT" in
+    MINGW*|MSYS*|CYGWIN*)
+        IS_WINDOWS=1
+        ;;
+esac
 BACKEND_DIR="$ROOT_DIR/backend"
 MOBILE_DIR="$ROOT_DIR/mobile"
 WEB_DIR="$ROOT_DIR/flutter_web"
 CRAWLER_DIR="$ROOT_DIR/crawler"
 VENV_DIR="$ROOT_DIR/.venv"
+VENV_BIN="bin"
+if [ "$IS_WINDOWS" = "1" ]; then
+    VENV_BIN="Scripts"
+fi
+FLUTTER_CMD="flutter"
+if [ "$IS_WINDOWS" = "1" ] && command -v flutter.bat >/dev/null 2>&1; then
+    FLUTTER_CMD="flutter.bat"
+fi
 REQUIREMENTS_FILE="$BACKEND_DIR/requirements.txt"
 PID_DIR="$ROOT_DIR/.pids"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
@@ -39,10 +61,10 @@ SCHEDULER_PID_FILE="$PID_DIR/scheduler.pid"
 
 mkdir -p "$PID_DIR"
 
-if [ -d "$VENV_DIR" ] && [ -x "$VENV_DIR/bin/python" ]; then
-    VENV_PY_OK="$($VENV_DIR/bin/python -c 'import sys; print(int(sys.version_info >= (3,10)))' 2>/dev/null || echo 0)"
+if [ -d "$VENV_DIR" ] && [ -x "$VENV_DIR/$VENV_BIN/python" ]; then
+    VENV_PY_OK="$("$VENV_DIR/$VENV_BIN/python" -c 'import sys; print(int(sys.version_info >= (3,10)))' 2>/dev/null || echo 0)"
     if [ "$VENV_PY_OK" != "1" ]; then
-        echo "Error: existing venv '$VENV_DIR' uses $($VENV_DIR/bin/python -V 2>&1), but backend needs Python >= 3.10." >&2
+        echo "Error: existing venv '$VENV_DIR' uses $("$VENV_DIR/$VENV_BIN/python" -V 2>&1), but backend needs Python >= 3.10." >&2
         echo "Fix: remove the venv and re-run: rm -rf $VENV_DIR && bash run.sh" >&2
         exit 1
     fi
@@ -50,15 +72,15 @@ fi
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating Python virtual environment..."
-    "$PYTHON_BIN" -m venv "$VENV_DIR"
+    "${PYTHON_CMD[@]}" -m venv "$VENV_DIR"
 fi
 
-source "$VENV_DIR/bin/activate"
+source "$VENV_DIR/$VENV_BIN/activate"
 
 if [ -f "$REQUIREMENTS_FILE" ]; then
     echo "Installing Python requirements..."
-    pip install --upgrade pip
-    pip install -r "$REQUIREMENTS_FILE"
+    "$VENV_DIR/$VENV_BIN/python" -m pip install --upgrade pip
+    "$VENV_DIR/$VENV_BIN/python" -m pip install -r "$REQUIREMENTS_FILE"
 else
     echo "Warning: $REQUIREMENTS_FILE not found. Skipping Python requirements install."
 fi
@@ -67,7 +89,7 @@ fi
 START_SCHEDULER="${START_SCHEDULER:-0}"
 if [ "$START_SCHEDULER" = "1" ]; then
     echo "Starting crawler scheduler..."
-    nohup bash -c "source \"$VENV_DIR/bin/activate\" && exec python3 \"$CRAWLER_DIR/schedule_crawler.py\"" > "$ROOT_DIR/crawler_scheduler.log" 2>&1 &
+    nohup bash -c "source \"$VENV_DIR/$VENV_BIN/activate\" && exec python3 \"$CRAWLER_DIR/schedule_crawler.py\"" > "$ROOT_DIR/crawler_scheduler.log" 2>&1 &
     echo "$!" > "$SCHEDULER_PID_FILE"
     echo "Scheduler PID: $(cat "$SCHEDULER_PID_FILE") (logs: crawler_scheduler.log)"
 else
@@ -129,8 +151,8 @@ PY
         fi
     fi
     cd "$MOBILE_DIR"
-    flutter pub get
-    RUN_CMD=(flutter run)
+    "$FLUTTER_CMD" pub get
+    RUN_CMD=("$FLUTTER_CMD" run)
     if [ -z "$API_BASE_URL" ]; then
         if [ -n "$DEVICE_ID" ]; then
             # iOS simulator should use localhost; Android emulator uses 10.0.2.2
@@ -168,8 +190,8 @@ if [ "$START_WEB" = "1" ]; then
         else
             echo "Starting Flutter web app..."
             cd "$WEB_DIR"
-            flutter pub get
-            nohup flutter run -d "$WEB_DEVICE" --dart-define=API_BASE_URL="$WEB_API_BASE_URL" > "$ROOT_DIR/flutter_web.log" 2>&1 &
+            "$FLUTTER_CMD" pub get
+            nohup "$FLUTTER_CMD" run -d "$WEB_DEVICE" --dart-define=API_BASE_URL="$WEB_API_BASE_URL" > "$ROOT_DIR/flutter_web.log" 2>&1 &
             echo "$!" > "$WEB_PID_FILE"
             cd - >/dev/null
         fi

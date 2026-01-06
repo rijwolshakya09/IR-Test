@@ -83,6 +83,7 @@ python3 playwright_crawler.py --outdir ../data --user-data-dir ./pw-profile --he
 ```
 
 Crawler options:
+- Default target: Coventry PurePortal ICS Research Centre publications
 - `--portal-root` (env: `PORTAL_ROOT`)
 - `--base-url` (env: `BASE_URL`)
 - `--retries` (env: `CRAWLER_RETRIES`)

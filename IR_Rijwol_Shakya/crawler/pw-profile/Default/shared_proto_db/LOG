@@ -1,3 +1,2 @@
-2025/12/26-09:16:52.612 8aa3 Reusing MANIFEST /Users/dmn/Documents/Projects/IR/IR-shankar-ghimire/IR_Rijwol_Shakya/crawler/pw-profile/Default/shared_proto_db/MANIFEST-000001
-2025/12/26-09:16:52.612 8aa3 Recovering log #3
-2025/12/26-09:16:52.613 8aa3 Reusing old log /Users/dmn/Documents/Projects/IR/IR-shankar-ghimire/IR_Rijwol_Shakya/crawler/pw-profile/Default/shared_proto_db/000003.log 
+2026/01/06-08:10:37.183 5650 Creating DB D:\Masters\Information Retrieval\FinalTest\IR-Test\IR_Rijwol_Shakya\crawler\pw-profile\Default\shared_proto_db since it was missing.
+2026/01/06-08:10:37.192 5650 Reusing MANIFEST D:\Masters\Information Retrieval\FinalTest\IR-Test\IR_Rijwol_Shakya\crawler\pw-profile\Default\shared_proto_db/MANIFEST-000001
