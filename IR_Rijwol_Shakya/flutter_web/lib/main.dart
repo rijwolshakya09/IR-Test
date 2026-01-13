@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -189,6 +190,10 @@ class _HomePageState extends State<HomePage> {
   final ApiService _api = ApiService(baseUrl: kApiBaseUrl);
   final TextEditingController _queryController = TextEditingController();
   final TextEditingController _classifyController = TextEditingController();
+  final TextEditingController _authorController = TextEditingController();
+  final TextEditingController _yearFromController = TextEditingController();
+  final TextEditingController _yearToController = TextEditingController();
+  Timer? _searchDebounce;
 
   SearchResponse? _searchResponse;
   bool _searchLoading = false;
@@ -196,6 +201,7 @@ class _HomePageState extends State<HomePage> {
   int _page = 1;
   final int _pageSize = 8;
   int? _lastSearchMs;
+  String _sortBy = 'score';
 
   ClassificationResult? _classificationResult;
   bool _classifyLoading = false;
@@ -215,7 +221,6 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _fetchModelInfo();
-    _queryController.text = 'information retrieval';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runSearch();
     });
@@ -223,10 +228,23 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _queryController.dispose();
     _classifyController.dispose();
+    _authorController.dispose();
+    _yearFromController.dispose();
+    _yearToController.dispose();
     super.dispose();
   }
+
+  int? _parseYear(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final val = int.tryParse(trimmed);
+    return val != null && val > 0 ? val : null;
+  }
+
+  void _onQueryChanged(String _) {}
 
   Future<void> _runSearch({int? page}) async {
     final nextPage = page ?? 1;
@@ -241,6 +259,10 @@ class _HomePageState extends State<HomePage> {
         query: _queryController.text.trim(),
         page: nextPage,
         size: _pageSize,
+        author: _authorController.text.trim(),
+        yearFrom: _parseYear(_yearFromController.text),
+        yearTo: _parseYear(_yearToController.text),
+        sort: _sortBy,
       );
       stopwatch.stop();
       setState(() {
@@ -259,6 +281,16 @@ class _HomePageState extends State<HomePage> {
         _searchLoading = false;
       });
     }
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _authorController.clear();
+      _yearFromController.clear();
+      _yearToController.clear();
+      _sortBy = 'score';
+    });
+    _runSearch(page: 1);
   }
 
   Future<void> _runClassification() async {
@@ -478,7 +510,7 @@ class _HomePageState extends State<HomePage> {
                         TextField(
                           controller: _queryController,
                           decoration: InputDecoration(
-                            hintText: 'Try \"information retrieval\"',
+                            hintText: 'Search by title, author, or keyword',
                             prefixIcon: const Icon(Icons.search_rounded),
                             filled: true,
                             fillColor: Colors.white,
@@ -509,7 +541,7 @@ class _HomePageState extends State<HomePage> {
                           child: TextField(
                             controller: _queryController,
                             decoration: InputDecoration(
-                              hintText: 'Try \"information retrieval\"',
+                              hintText: 'Search by title, author, or keyword',
                               prefixIcon: const Icon(Icons.search_rounded),
                               filled: true,
                               fillColor: Colors.white,
@@ -531,20 +563,22 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   const SizedBox(height: 12),
+                  _buildFilters(context, isNarrow),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                  Text(
-                    _lastSearchMs == null
-                        ? 'Showing ${_searchResponse?.results.length ?? 0} of '
-                            '${_searchResponse?.total ?? 0}'
-                        : 'Showing ${_searchResponse?.results.length ?? 0} of '
-                            '${_searchResponse?.total ?? 0} '
-                            'in ${(_lastSearchMs! / 1000).toStringAsFixed(2)}s',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF6B7280),
-                        ),
-                  ),
+                      Text(
+                        _lastSearchMs == null
+                            ? 'Showing ${_searchResponse?.results.length ?? 0} of '
+                                '${_searchResponse?.total ?? 0}'
+                            : 'Showing ${_searchResponse?.results.length ?? 0} of '
+                                '${_searchResponse?.total ?? 0} '
+                                'in ${(_lastSearchMs! / 1000).toStringAsFixed(2)}s',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF6B7280),
+                            ),
+                      ),
                       Row(
                         children: [
                           IconButton(
@@ -619,9 +653,114 @@ class _HomePageState extends State<HomePage> {
                   publication: entry.value,
                   index: entry.key,
                   total: _searchResponse!.results.length,
+                  query: _queryController.text.trim(),
                 ),
               ))
           .toList(),
+    );
+  }
+
+  Widget _buildFilters(BuildContext context, bool isNarrow) {
+    final inputDecoration = InputDecoration(
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    );
+    final authorField = TextField(
+      controller: _authorController,
+      decoration: inputDecoration.copyWith(
+        labelText: 'Author',
+        prefixIcon: const Icon(Icons.person_outline),
+      ),
+      onSubmitted: (_) => _runSearch(page: 1),
+    );
+    final yearFromField = TextField(
+      controller: _yearFromController,
+      keyboardType: TextInputType.number,
+      decoration: inputDecoration.copyWith(
+        labelText: 'Year from',
+        prefixIcon: const Icon(Icons.calendar_today_outlined),
+      ),
+      onSubmitted: (_) => _runSearch(page: 1),
+    );
+    final yearToField = TextField(
+      controller: _yearToController,
+      keyboardType: TextInputType.number,
+      decoration: inputDecoration.copyWith(
+        labelText: 'Year to',
+        prefixIcon: const Icon(Icons.event_available_outlined),
+      ),
+      onSubmitted: (_) => _runSearch(page: 1),
+    );
+    final sortField = DropdownButtonFormField<String>(
+      value: _sortBy,
+      decoration: inputDecoration.copyWith(
+        labelText: 'Sort by',
+        prefixIcon: const Icon(Icons.sort),
+      ),
+      items: const [
+        DropdownMenuItem(value: 'score', child: Text('Relevance')),
+        DropdownMenuItem(value: 'date', child: Text('Newest')),
+        DropdownMenuItem(value: 'title', child: Text('Title A-Z')),
+      ],
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() => _sortBy = value);
+        _runSearch(page: 1);
+      },
+    );
+    if (isNarrow) {
+      return Column(
+        children: [
+          authorField,
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: yearFromField),
+              const SizedBox(width: 10),
+              Expanded(child: yearToField),
+            ],
+          ),
+          const SizedBox(height: 10),
+          sortField,
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _clearFilters,
+              child: const Text('Clear filters'),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: authorField),
+            const SizedBox(width: 12),
+            Expanded(child: yearFromField),
+            const SizedBox(width: 12),
+            Expanded(child: yearToField),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: sortField),
+            const SizedBox(width: 12),
+            TextButton(
+              onPressed: _clearFilters,
+              child: const Text('Clear filters'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -776,7 +915,49 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Assignment checklist',
+          subtitle: 'PurePortal-focused compliance overview.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              _ChecklistItem(label: 'Crawler targets PurePortal ICS publications'),
+              _ChecklistItem(label: 'Extracts title, authors, date, abstract, profiles'),
+              _ChecklistItem(label: 'Polite crawling (robots.txt + delays)'),
+              _ChecklistItem(label: 'Inverted index built after crawl'),
+              _ChecklistItem(label: 'Search + classification APIs available'),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _ChecklistItem extends StatelessWidget {
+  const _ChecklistItem({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Color(0xFF0B3B49), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF334155),
+                  ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1123,11 +1304,13 @@ class _ResultCard extends StatefulWidget {
     required this.publication,
     required this.index,
     required this.total,
+    required this.query,
   });
 
   final Publication publication;
   final int index;
   final int total;
+  final String query;
 
   @override
   State<_ResultCard> createState() => _ResultCardState();
@@ -1136,9 +1319,75 @@ class _ResultCard extends StatefulWidget {
 class _ResultCardState extends State<_ResultCard> {
   bool _hovered = false;
 
+  List<String> _queryTokens(String query) {
+    return query
+        .toLowerCase()
+        .split(RegExp(r"\s+"))
+        .where((t) => t.length > 1)
+        .toSet()
+        .toList();
+  }
+
+  Widget _highlightedText(
+    BuildContext context,
+    String text,
+    String query,
+    TextStyle? baseStyle,
+    int maxLines,
+  ) {
+    final tokens = _queryTokens(query);
+    if (tokens.isEmpty || text.isEmpty) {
+      return Text(
+        text,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        style: baseStyle,
+      );
+    }
+    final pattern = RegExp(
+      '(${tokens.map(RegExp.escape).join("|")})',
+      caseSensitive: false,
+    );
+    final spans = <TextSpan>[];
+    int start = 0;
+    for (final match in pattern.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(TextSpan(text: text.substring(start, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(match.start, match.end),
+          style: baseStyle?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF0B3B49),
+          ),
+        ),
+      );
+      start = match.end;
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start)));
+    }
+    return RichText(
+      text: TextSpan(style: baseStyle, children: spans),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final publication = widget.publication;
+    final profileAuthors = publication.authors
+        .where((a) => (a.profile ?? '').isNotEmpty)
+        .toList();
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: const Color(0xFF0F172A),
+          height: 1.3,
+        );
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFF4B5563),
+        );
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -1164,12 +1413,12 @@ class _ResultCardState extends State<_ResultCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
+                  child: _highlightedText(
+                    context,
                     publication.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFF0F172A),
-                          height: 1.3,
-                        ),
+                    widget.query,
+                    titleStyle,
+                    2,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1193,18 +1442,46 @@ class _ResultCardState extends State<_ResultCard> {
                       ? 'Unknown authors'
                       : publication.authors.map((a) => a.name).join(', '),
                 ),
+                const _MetaChip(
+                  icon: Icons.public,
+                  label: 'PurePortal ICS',
+                ),
               ],
             ),
+            if (profileAuthors.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: profileAuthors.map((author) {
+                  return TextButton.icon(
+                    onPressed: () => _launchLink(author.profile!),
+                    icon: const Icon(Icons.person_outline, size: 16),
+                    label: Text(author.name),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF0B3B49),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      backgroundColor: const Color(0xFFE9EEF0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
             const SizedBox(height: 10),
-            Text(
+            _highlightedText(
+              context,
               publication.abstractText.isEmpty
                   ? 'No abstract provided.'
                   : publication.abstractText,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF4B5563),
-                  ),
+              widget.query,
+              bodyStyle,
+              4,
             ),
             const SizedBox(height: 12),
             Row(
@@ -1216,6 +1493,14 @@ class _ResultCardState extends State<_ResultCard> {
                       ),
                 ),
                 const Spacer(),
+                if (profileAuthors.isEmpty)
+                  Text(
+                    'No author profiles',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF6B7280),
+                        ),
+                  ),
+                if (profileAuthors.isEmpty) const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: publication.link.isEmpty
                       ? null

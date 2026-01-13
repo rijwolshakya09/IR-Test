@@ -2,22 +2,22 @@
 """
 Weekly scheduler for the crawler (Sunday at midnight).
 """
-import subprocess
-import time
 import os
+import subprocess
+import sys
+import time
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
-VENV_PATH = os.path.join(os.path.dirname(__file__), "..", ".venv", "bin", "activate")
-CRAWLER_SCRIPT = os.path.join(os.path.dirname(__file__), "playwright_crawler.py")
+BASE_DIR = os.path.dirname(__file__)
+VENV_PY = os.path.join(BASE_DIR, "..", ".venv", "bin", "python")
+CRAWLER_SCRIPT = os.path.join(BASE_DIR, "crawler.py")
 
 
 def run_crawler():
     print("[Scheduler] Running crawler...")
-    subprocess.run(
-        f"source {VENV_PATH} && python {CRAWLER_SCRIPT}",
-        shell=True,
-        check=False,
-    )
+    python_bin = VENV_PY if os.path.exists(VENV_PY) else sys.executable
+    subprocess.run([python_bin, CRAWLER_SCRIPT], check=False)
     print("[Scheduler] Crawler finished.")
 
 

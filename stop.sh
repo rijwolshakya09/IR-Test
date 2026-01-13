@@ -1,7 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+APP_TARGET="${APP_TARGET:-default}"
+
 PID_DIR=".pids"
+if [ "$APP_TARGET" = "ir" ]; then
+  PID_DIR="IR_Rijwol_Shakya/.pids"
+fi
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 SCHEDULER_PID_FILE="$PID_DIR/scheduler.pid"
@@ -22,10 +27,11 @@ kill_if_running() {
 
 kill_if_running "$SCHEDULER_PID_FILE" "crawler scheduler"
 kill_if_running "$BACKEND_PID_FILE" "backend (uvicorn)"
-kill_if_running "$FRONTEND_PID_FILE" "frontend (next dev)"
+kill_if_running "$FRONTEND_PID_FILE" "frontend"
 
 # Fallback if pid files are missing
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "next dev" 2>/dev/null || true
+pkill -f "flutter run -d web-server" 2>/dev/null || true
 
 echo "Servers stopped."

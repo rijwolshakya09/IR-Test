@@ -11,12 +11,27 @@ class ApiService {
     String query = '',
     int page = 1,
     int size = 10,
+    String author = '',
+    int? yearFrom,
+    int? yearTo,
+    String sort = 'score',
   }) async {
-    final uri = Uri.parse('$baseUrl/search').replace(queryParameters: {
+    final params = <String, String>{
       'query': query,
       'page': page.toString(),
       'size': size.toString(),
-    });
+      'sort': sort,
+    };
+    if (author.trim().isNotEmpty) {
+      params['author'] = author.trim();
+    }
+    if (yearFrom != null && yearFrom > 0) {
+      params['year_from'] = yearFrom.toString();
+    }
+    if (yearTo != null && yearTo > 0) {
+      params['year_to'] = yearTo.toString();
+    }
+    final uri = Uri.parse('$baseUrl/search').replace(queryParameters: params);
 
     final response = await http.get(uri);
     if (response.statusCode != 200) {

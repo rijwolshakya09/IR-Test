@@ -41,6 +41,7 @@ class DocumentClassificationSystem:
         self.data_dir = data_dir
         self.stemmer = PorterStemmer()
         self.stop_words = set(stopwords.words("english"))
+        self.keyword_map = self._build_keyword_map()
         self.vectorizer = None
         self.model = None
         self.is_trained = False
@@ -91,16 +92,133 @@ class DocumentClassificationSystem:
             },
         ]
 
-    def preprocess_text(self, text: str) -> str:
+    def _build_keyword_map(self) -> Dict[str, List[str]]:
+        return {
+            "business": [
+                "business",
+                "account",
+                "finance",
+                "market",
+                "revenue",
+                "profit",
+                "earnings",
+                "stock",
+                "investment",
+                "merger",
+                "startup",
+                "budget",
+                "sales",
+                "supply",
+                "logistics",
+                "operations",
+            ],
+            "entertainment": [
+                "entertainment",
+                "movie",
+                "movies",
+                "film",
+                "series",
+                "television",
+                "tv",
+                "music",
+                "concert",
+                "festival",
+                "award",
+                "game",
+                "gaming",
+                "theater",
+                "theatre",
+                "podcast",
+                "streaming",
+                "animation",
+                "show",
+                "box",
+                "office",
+            ],
+            "health": [
+                "health",
+                "hospital",
+                "clinic",
+                "patient",
+                "vaccine",
+                "disease",
+                "treatment",
+                "medical",
+                "mental",
+                "wellness",
+                "epidemiology",
+                "diagnosis",
+                "trial",
+                "drug",
+                "nutrition",
+                "care",
+                "surgery",
+                "public",
+            ],
+        }
+
+    def _tokenize(self, text: str) -> List[str]:
         text = text.lower()
         text = re.sub(r"[^a-zA-Z\s]", " ", text)
         tokens = word_tokenize(text)
-        processed_tokens = [
+        return [
             self.stemmer.stem(token)
             for token in tokens
             if token not in self.stop_words and len(token) > 2
         ]
-        return " ".join(processed_tokens)
+
+    def preprocess_text(self, text: str) -> str:
+        return " ".join(self._tokenize(text))
+
+    def _keyword_fallback(self, text: str) -> Dict | None:
+        tokens = self._tokenize(text)
+        if not tokens:
+            return None
+        scores = {}
+        for category in self.categories:
+            keywords = self.keyword_map.get(category, [])
+            keyword_stems = {self.stemmer.stem(k) for k in keywords}
+            score = sum(1 for token in tokens if token in keyword_stems)
+            scores[category] = score
+
+        total = sum(scores.values())
+        if total == 0:
+            return None
+
+        predicted_category = max(scores.items(), key=lambda item: item[1])[0]
+        probabilities = {cat: val / total for cat, val in scores.items()}
+        confidence = probabilities.get(predicted_category, 0.0)
+        explanation = (
+            "The model used a keyword fallback because the input did not match "
+            "the learned vocabulary. Add more descriptive text for higher confidence."
+        )
+        return {
+            "predicted_category": predicted_category,
+            "confidence": confidence,
+            "probabilities": probabilities,
+            "explanation": explanation,
+            "model_used": f"{self.model_type} (keyword fallback)",
+            "text_length": len(text),
+            "processed_text_length": len(" ".join(tokens)),
+        }
+
+    def _no_signal_response(self, text: str, processed_text: str) -> Dict:
+        total = max(1, len(self.categories))
+        probabilities = {cat: 1 / total for cat in self.categories}
+        predicted_category = self.categories[0] if self.categories else "unknown"
+        explanation = (
+            "The input did not contain enough known terms to score reliably. "
+            "Try a longer sentence or add more context."
+        )
+        return {
+            "predicted_category": predicted_category,
+            "confidence": probabilities.get(predicted_category, 0.0),
+            "probabilities": probabilities,
+            "explanation": explanation,
+            "model_used": f"{self.model_type} (no-signal fallback)",
+            "text_length": len(text),
+            "processed_text_length": len(processed_text),
+        }
 
     def train_model(self) -> Dict:
         texts = [doc["text"] for doc in self.training_documents]
@@ -164,7 +282,17 @@ class DocumentClassificationSystem:
             raise ValueError("Model must be trained before classification")
 
         processed_text = self.preprocess_text(text)
+        if not processed_text:
+            fallback = self._keyword_fallback(text)
+            if fallback:
+                return fallback
+            return self._no_signal_response(text, processed_text)
         text_vec = self.vectorizer.transform([processed_text])
+        if text_vec.nnz == 0:
+            fallback = self._keyword_fallback(text)
+            if fallback:
+                return fallback
+            return self._no_signal_response(text, processed_text)
         prediction = self.model.predict(text_vec)[0]
         probabilities = self.model.predict_proba(text_vec)[0]
 

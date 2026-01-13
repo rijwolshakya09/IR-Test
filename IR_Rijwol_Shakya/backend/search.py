@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from typing import List, Dict
 
@@ -21,6 +22,14 @@ def load_publications(
         with open(filepath_fallback, "r", encoding="utf-8") as f:
             data = json.load(f)
     return data
+
+
+def load_inverted_index(filepath: str = "../data/inverted_index.json") -> Dict:
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
 
 
 # ---------- NLTK helpers ----------
@@ -75,31 +84,74 @@ def _normalize_record(r: Dict) -> Dict:
 
 # ---------- Engine ----------
 class SearchEngine:
-    def __init__(self, publications: List[Dict]):
-        self.publications = [_normalize_record(p) for p in publications]
-        self.searchable_content = []
-        for pub in self.publications:
-            title = pub.get("title", "")
-            authors_objects = pub.get("authors", [])
-            authors_text = " ".join(
-                [
-                    author.get("name", "") if isinstance(author, dict) else str(author)
-                    for author in authors_objects
-                ]
-            )
-            abstract = pub.get("abstract", "")
-            blob = (
-                f"{preprocess_text(title)} {preprocess_text(authors_text)} "
-                f"{preprocess_text(abstract)}"
-            )
-            self.searchable_content.append(blob)
+    def __init__(self, publications: List[Dict], index_data: Dict = None):
+        self.use_index = False
+        if index_data and index_data.get("index") and index_data.get("docs"):
+            self.use_index = True
+            self.index = index_data.get("index", {})
+            self.doc_len = index_data.get("doc_len", [])
+            self.publications = index_data.get("docs", [])
+        else:
+            self.publications = [_normalize_record(p) for p in publications]
+            self.searchable_content = []
+            for pub in self.publications:
+                title = pub.get("title", "")
+                authors_objects = pub.get("authors", [])
+                authors_text = " ".join(
+                    [
+                        author.get("name", "") if isinstance(author, dict) else str(author)
+                        for author in authors_objects
+                    ]
+                )
+                abstract = pub.get("abstract", "")
+                blob = (
+                    f"{preprocess_text(title)} {preprocess_text(authors_text)} "
+                    f"{preprocess_text(abstract)}"
+                )
+                self.searchable_content.append(blob)
 
-        self.vectorizer = TfidfVectorizer()
-        self.tfidf_matrix = self.vectorizer.fit_transform(self.searchable_content)
+            self.vectorizer = TfidfVectorizer()
+            self.tfidf_matrix = self.vectorizer.fit_transform(self.searchable_content)
 
     def search(self, query: str) -> List[Dict]:
         if not query.strip():
             return []
+
+        if self.use_index:
+            tokens = preprocess_text(query).split()
+            scores: Dict[int, float] = {}
+            n_docs = len(self.publications)
+            for term in tokens:
+                entry = self.index.get(term)
+                if not entry:
+                    continue
+                df = entry.get("df", 0) or 0
+                idf = math.log((n_docs + 1) / (df + 1)) + 1.0
+                postings = entry.get("postings", {})
+                for doc_id_str, tf in postings.items():
+                    doc_id = int(doc_id_str)
+                    length = self.doc_len[doc_id] if doc_id < len(self.doc_len) else 1
+                    score = (float(tf) / max(1, length)) * idf
+                    scores[doc_id] = scores.get(doc_id, 0.0) + score
+
+            ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+            results = []
+            for doc_id, score in ranked:
+                if score < 0.01:
+                    continue
+                item = dict(self.publications[doc_id])
+                item["score"] = round(float(score), 2)
+                return_fields = [
+                    "title",
+                    "link",
+                    "authors",
+                    "published_date",
+                    "abstract",
+                    "score",
+                ]
+                formatted_item = {k: item.get(k, "") for k in return_fields}
+                results.append(formatted_item)
+            return results
 
         q_vec = self.vectorizer.transform([preprocess_text(query)])
         sims = cosine_similarity(q_vec, self.tfidf_matrix).flatten()

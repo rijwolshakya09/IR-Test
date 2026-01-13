@@ -68,18 +68,12 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
 ## Crawler
-Crawler uses Playwright with a persistent profile to pass captcha:
+Crawler uses Selenium + BeautifulSoup for Coventry PurePortal:
 
 ```bash
 cd IR_Rijwol_Shakya/crawler
 pip install -r requirements.txt
-python3 -m playwright install chromium
-
-# First run (visible) to solve captcha:
-python3 playwright_crawler.py --outdir ../data --user-data-dir ./pw-profile --headless 0 --wait-for-human
-
-# Later runs (headless) reuse the profile:
-python3 playwright_crawler.py --outdir ../data --user-data-dir ./pw-profile --headless 1
+python3 crawler.py --max-pages 10 --workers 3 --use-regular-selenium
 ```
 
 Crawler options:
@@ -88,19 +82,27 @@ Crawler options:
 - `--base-url` (env: `BASE_URL`)
 - `--retries` (env: `CRAWLER_RETRIES`)
 - `--retry-delay` (env: `CRAWLER_RETRY_DELAY`)
+- `--crawl-delay` (env: `CRAWLER_DELAY`) to respect polite delays
 - `--screenshot-dir` to save failure screenshots
-- `--user-data-dir` to reuse captcha-approved session (Playwright)
+- `--rebuild-index` to refresh the inverted index after crawl
 
-### OpenAlex (data science) test data
-If you need large, captcha-free test data, use OpenAlex:
+### Scheduled crawl (weekly)
+Run a simple weekly scheduler (Sunday at midnight):
 
 ```bash
 cd IR_Rijwol_Shakya/crawler
-pip install -r requirements.txt
-python3 openalex_crawler.py --outdir ../data --query "data science" --max-records 2000 --mailto you@example.com
+python3 schedule_crawler.py
 ```
 
 ## Next steps
 - Adjust crawler targets and selectors if you change the source portal
 - Populate `data/publications.json` and `data/training_documents.csv`
+- Build the inverted index after crawling: `python3 backend/indexer.py --data-dir data`
 - Tweak Flutter UI and filters to match your desired design
+
+## Assignment compliance checklist
+- Crawler targets Coventry PurePortal (ICS Research Centre) and extracts title, authors, date, abstract, and author profile links.
+- Politeness: robots.txt checks, crawl delay, and retries are built in.
+- Inverted index: build with `backend/indexer.py` and search uses it when available.
+- Query processor: ranked results exposed via `/search` and shown in Flutter web.
+- Classification: Naive Bayes and Logistic Regression models trained from `data/` CSVs.

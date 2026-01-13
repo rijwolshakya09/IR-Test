@@ -28,12 +28,14 @@ if [ "$PY_OK" != "1" ]; then
     exit 1
 fi
 
-# Backend setup
+APP_TARGET="${APP_TARGET:-default}"
+
+# Backend setup (default project)
 BACKEND_DIR="backend"
 VENV_DIR=".venv"
 REQUIREMENTS_FILE="$BACKEND_DIR/requirements.txt"
 
-# Frontend setup
+# Frontend setup (default project)
 FRONTEND_DIR="frontend"
 PACKAGE_JSON="$FRONTEND_DIR/package.json"
 
@@ -41,9 +43,25 @@ PID_DIR=".pids"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 SCHEDULER_PID_FILE="$PID_DIR/scheduler.pid"
+BACKEND_LOG="backend.log"
+FRONTEND_LOG="frontend.log"
 
 # Optional: start crawler scheduler (weekly job)
 START_SCHEDULER="${START_SCHEDULER:-0}"
+
+if [ "$APP_TARGET" = "ir" ]; then
+    BACKEND_DIR="IR_Rijwol_Shakya/backend"
+    VENV_DIR="IR_Rijwol_Shakya/.venv"
+    REQUIREMENTS_FILE="$BACKEND_DIR/requirements.txt"
+    FRONTEND_DIR="IR_Rijwol_Shakya/flutter_web"
+    PACKAGE_JSON=""
+    PID_DIR="IR_Rijwol_Shakya/.pids"
+    BACKEND_PID_FILE="$PID_DIR/backend.pid"
+    FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
+    SCHEDULER_PID_FILE="$PID_DIR/scheduler.pid"
+    BACKEND_LOG="IR_Rijwol_Shakya/backend.log"
+    FRONTEND_LOG="IR_Rijwol_Shakya/flutter_web.log"
+fi
 
 mkdir -p "$PID_DIR"
 
@@ -72,41 +90,64 @@ else
     echo "Warning: $REQUIREMENTS_FILE not found. Skipping Python requirements install."
 fi
 
-# 2. Frontend: Install node modules if not present
-if [ -f "$PACKAGE_JSON" ]; then
-    if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
-        echo "Installing Node.js dependencies..."
+# 2. Frontend deps
+if [ "$APP_TARGET" = "ir" ]; then
+    if command -v flutter >/dev/null 2>&1; then
+        echo "Installing Flutter dependencies..."
         cd "$FRONTEND_DIR"
-        npm install
+        flutter pub get
         cd -
+    else
+        echo "Error: Flutter is not installed or not on PATH." >&2
+        exit 1
     fi
 else
-    echo "Warning: $PACKAGE_JSON not found. Skipping npm install."
+    if [ -f "$PACKAGE_JSON" ]; then
+        if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+            echo "Installing Node.js dependencies..."
+            cd "$FRONTEND_DIR"
+            npm install
+            cd -
+        fi
+    else
+        echo "Warning: $PACKAGE_JSON not found. Skipping npm install."
+    fi
 fi
 
 # 3. Optional: Start crawler scheduler (runs weekly; does not crawl immediately)
 if [ "$START_SCHEDULER" = "1" ]; then
-    echo "Starting crawler scheduler (weekly)..."
-    nohup bash -c "source \"$VENV_DIR/bin/activate\" && exec python3 schedule_crawler.py" > crawler_scheduler.log 2>&1 &
-    echo "$!" > "$SCHEDULER_PID_FILE"
-    echo "Crawler Scheduler PID: $(cat "$SCHEDULER_PID_FILE") (logs: crawler_scheduler.log)"
+    if [ "$APP_TARGET" = "ir" ]; then
+        echo "Starting crawler scheduler (weekly)..."
+        nohup bash -c "source \"$VENV_DIR/bin/activate\" && exec python3 IR_Rijwol_Shakya/crawler/schedule_crawler.py" > IR_Rijwol_Shakya/crawler_scheduler.log 2>&1 &
+        echo "$!" > "$SCHEDULER_PID_FILE"
+        echo "Crawler Scheduler PID: $(cat "$SCHEDULER_PID_FILE") (logs: IR_Rijwol_Shakya/crawler_scheduler.log)"
+    else
+        echo "Starting crawler scheduler (weekly)..."
+        nohup bash -c "source \"$VENV_DIR/bin/activate\" && exec python3 schedule_crawler.py" > crawler_scheduler.log 2>&1 &
+        echo "$!" > "$SCHEDULER_PID_FILE"
+        echo "Crawler Scheduler PID: $(cat "$SCHEDULER_PID_FILE") (logs: crawler_scheduler.log)"
+    fi
 else
     echo "Skipping crawler scheduler (set START_SCHEDULER=1 to enable)."
 fi
 
 # 4. Start backend (FastAPI)
 echo "Starting backend server..."
-nohup bash -c "cd \"$BACKEND_DIR\" && exec uvicorn main:app --reload --host 0.0.0.0 --port 8000" > backend.log 2>&1 &
+nohup bash -c "cd \"$BACKEND_DIR\" && exec uvicorn main:app --reload --host 0.0.0.0 --port 8000" > "$BACKEND_LOG" 2>&1 &
 echo "$!" > "$BACKEND_PID_FILE"
 
-# 5. Start frontend (Next.js)
+# 5. Start frontend
 echo "Starting frontend server..."
-nohup bash -c "cd \"$FRONTEND_DIR\" && exec npm run dev" > frontend.log 2>&1 &
+if [ "$APP_TARGET" = "ir" ]; then
+    nohup bash -c "cd \"$FRONTEND_DIR\" && exec flutter run -d web-server --web-hostname 0.0.0.0 --web-port 3000" > "$FRONTEND_LOG" 2>&1 &
+else
+    nohup bash -c "cd \"$FRONTEND_DIR\" && exec npm run dev" > "$FRONTEND_LOG" 2>&1 &
+fi
 echo "$!" > "$FRONTEND_PID_FILE"
 
 
 # 6. Show status
-echo "Backend PID: $(cat "$BACKEND_PID_FILE") (logs: backend.log)"
-echo "Frontend PID: $(cat "$FRONTEND_PID_FILE") (logs: frontend.log)"
+echo "Backend PID: $(cat "$BACKEND_PID_FILE") (logs: $BACKEND_LOG)"
+echo "Frontend PID: $(cat "$FRONTEND_PID_FILE") (logs: $FRONTEND_LOG)"
 echo "Servers are starting. Access frontend at http://localhost:3000 and backend at http://localhost:8000"
 echo "To stop the servers, run: ./stop.sh"

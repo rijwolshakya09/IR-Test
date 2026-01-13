@@ -1,13 +1,15 @@
 import logging
 import os
+import re
 import time
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-from search import SearchEngine, load_publications
+from search import SearchEngine, load_publications, load_inverted_index
 from classification_ml import classify_document, get_model_info, train_models
+from clustering_ml import cluster_document, get_cluster_model_info, train_cluster_model
 from dotenv import load_dotenv
 
 app = FastAPI()
@@ -35,7 +37,8 @@ publications_data = load_publications(
     filepath_primary=os.path.join(DATA_DIR, "publications.json"),
     filepath_fallback=os.path.join(DATA_DIR, "publications_links.json"),
 )
-search_engine = SearchEngine(publications_data)
+index_data = load_inverted_index(os.path.join(DATA_DIR, "inverted_index.json"))
+search_engine = SearchEngine(publications_data, index_data=index_data)
 
 _search_cache = {}
 
@@ -62,6 +65,10 @@ class ClassificationRequest(BaseModel):
     model_type: str = "naive_bayes"
 
 
+class ClusteringRequest(BaseModel):
+    text: str
+
+
 @app.get("/")
 def read_root():
     return {"status": "ok"}
@@ -75,9 +82,51 @@ def health():
         "data_dir": DATA_DIR,
     }
 
+def _extract_year(date_str: str) -> int:
+    if not date_str:
+        return 0
+    match = re.search(r"(19|20)\d{2}", str(date_str))
+    return int(match.group()) if match else 0
+
+
+def _matches_author(item, author_query: str) -> bool:
+    if not author_query:
+        return True
+    aq = author_query.strip().lower()
+    authors = item.get("authors", [])
+    if isinstance(authors, list):
+        for a in authors:
+            name = ""
+            if isinstance(a, dict):
+                name = a.get("name", "")
+            else:
+                name = str(a)
+            if aq in name.lower():
+                return True
+    return False
+
+
+def _matches_year(item, year_from: int, year_to: int) -> bool:
+    if not year_from and not year_to:
+        return True
+    year = _extract_year(item.get("published_date", ""))
+    if year_from and year < year_from:
+        return False
+    if year_to and year > year_to:
+        return False
+    return year != 0
+
 
 @app.get("/search")
-def search_publications(query: str = "", page: int = 1, size: int = 10):
+def search_publications(
+    query: str = "",
+    page: int = 1,
+    size: int = 10,
+    author: str = "",
+    year_from: int = 0,
+    year_to: int = 0,
+    sort: str = "score",
+):
     try:
         if not query.strip():
             results = []
@@ -99,13 +148,33 @@ def search_publications(query: str = "", page: int = 1, size: int = 10):
                 formatted_item = {k: item.get(k, "") for k in return_fields}
                 results.append(formatted_item)
         else:
-            key = query.strip().lower()
+            key = "|".join(
+                [
+                    query.strip().lower(),
+                    author.strip().lower(),
+                    str(year_from or ""),
+                    str(year_to or ""),
+                    sort.strip().lower(),
+                ]
+            )
             cached = _cache_get(key)
             if cached is None:
                 results = search_engine.search(query)
                 _cache_set(key, results)
             else:
                 results = cached
+
+        if author.strip():
+            results = [r for r in results if _matches_author(r, author)]
+        if year_from or year_to:
+            results = [r for r in results if _matches_year(r, year_from, year_to)]
+
+        if sort == "date":
+            results.sort(key=lambda r: _extract_year(r.get("published_date", "")), reverse=True)
+        elif sort == "title":
+            results.sort(key=lambda r: (r.get("title") or "").lower())
+        else:
+            results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
 
         start_idx = (page - 1) * size
         end_idx = start_idx + size
@@ -146,5 +215,32 @@ def train_classification_models():
     try:
         results = train_models()
         return {"message": "Models trained successfully", "results": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/cluster")
+def cluster_text(request: ClusteringRequest):
+    if not request.text.strip():
+        return {"error": "Text is required for clustering"}
+    try:
+        return cluster_document(request.text)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/cluster-model-info")
+def cluster_model_info():
+    try:
+        return get_cluster_model_info()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/train-cluster-model")
+def train_clustering_model():
+    try:
+        results = train_cluster_model()
+        return {"message": "Cluster model trained successfully", "results": results}
     except Exception as e:
         return {"error": str(e)}

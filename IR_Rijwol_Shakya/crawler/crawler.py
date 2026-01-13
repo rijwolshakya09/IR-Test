@@ -6,6 +6,12 @@ from math import ceil
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import urljoin, urlparse, quote
+from urllib import robotparser, request as urlrequest
+from threading import Lock
+import subprocess
+import sys
+
+from bs4 import BeautifulSoup
 
 # Undetected Chrome Driver
 try:
@@ -46,15 +52,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 DEFAULT_PORTAL_ROOT = os.getenv("PORTAL_ROOT", "https://pureportal.coventry.ac.uk")
 DEFAULT_BASE_URL = os.getenv(
     "BASE_URL",
-    f"{DEFAULT_PORTAL_ROOT}/en/organisations/ics-research-centre-for-computational-science-and-mathematical-modelling/publications/",
+    f"{DEFAULT_PORTAL_ROOT}/en/organisations/ics-research-centre-for-computational-science-and-mathematical-mo/publications/",
 )
 PORTAL_ROOT = DEFAULT_PORTAL_ROOT
 PERSONS_PREFIX = "/en/persons/"
 BASE_URL = DEFAULT_BASE_URL
 RETRIES = int(os.getenv("CRAWLER_RETRIES", "3"))
 RETRY_DELAY = float(os.getenv("CRAWLER_RETRY_DELAY", "2.5"))
+CRAWL_DELAY = float(os.getenv("CRAWLER_DELAY", "1.0"))
 SCREENSHOT_DIR = None
 DEBUG_CAPTURE = False
+USER_AGENT = os.getenv(
+    "CRAWLER_USER_AGENT",
+    "IR-Crawler/1.0 (+https://pureportal.coventry.ac.uk)",
+)
+_ROBOTS_CACHE: Dict[str, robotparser.RobotFileParser] = {}
+_ROBOTS_LOCK = Lock()
+_LAST_REQUEST: Dict[str, float] = {}
 
 
 # =========================== Chrome helpers ===========================
@@ -215,6 +229,62 @@ def _maybe_dump_html(driver, label: str):
         print(f"[HTML] Failed: {e}")
 
 
+def _fetch_robots_txt(robots_url: str) -> Optional[str]:
+    try:
+        req = urlrequest.Request(robots_url, headers={"User-Agent": USER_AGENT})
+        with urlrequest.urlopen(req, timeout=10) as resp:
+            return resp.read().decode("utf-8", "ignore")
+    except Exception as e:
+        print(f"[ROBOTS] Warning: failed to fetch {robots_url}: {e}")
+        return None
+
+
+def _get_robot_parser(url: str) -> robotparser.RobotFileParser:
+    parsed = urlparse(url)
+    key = parsed.netloc
+    with _ROBOTS_LOCK:
+        rp = _ROBOTS_CACHE.get(key)
+        if rp:
+            return rp
+        rp = robotparser.RobotFileParser()
+        robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+        body = _fetch_robots_txt(robots_url)
+        if body is None:
+            rp.parse([])
+        else:
+            rp.parse(body.splitlines())
+        _ROBOTS_CACHE[key] = rp
+        return rp
+
+
+def _robots_allow(url: str) -> bool:
+    rp = _get_robot_parser(url)
+    return rp.can_fetch(USER_AGENT, url)
+
+
+def _robots_delay(url: str) -> float:
+    rp = _get_robot_parser(url)
+    delay = rp.crawl_delay(USER_AGENT)
+    return float(delay) if delay else 0.0
+
+
+def _respect_crawl_delay(url: str):
+    parsed = urlparse(url)
+    netloc = parsed.netloc
+    delay = max(CRAWL_DELAY, _robots_delay(url))
+    if delay <= 0:
+        return
+    with _ROBOTS_LOCK:
+        last = _LAST_REQUEST.get(netloc)
+        now = time.monotonic()
+        if last is not None:
+            wait = delay - (now - last)
+            if wait > 0:
+                print(f"[POLITE] Sleeping {wait:.1f}s before next request to {netloc}")
+                time.sleep(wait)
+        _LAST_REQUEST[netloc] = time.monotonic()
+
+
 def wait_for_cloudflare_with_auto_click(driver, timeout: int = 30) -> bool:
     """Wait for Cloudflare challenge and attempt to auto-click if possible"""
     try:
@@ -306,6 +376,10 @@ def safe_get(driver, url: str, label: str):
     
     for attempt in range(RETRIES + 1):
         try:
+            if not _robots_allow(url):
+                raise Exception("Blocked by robots.txt rules")
+            _respect_crawl_delay(url)
+
             # Random delay before request (human-like behavior)
             delay = random.uniform(2, 4) if attempt == 0 else random.uniform(3, 6)
             print(f"[{label}] Waiting {delay:.1f}s before request (attempt {attempt + 1}/{RETRIES + 1})")
@@ -687,6 +761,36 @@ def _wrap_names_as_objs(names: List[str]) -> List[Dict]:
     return _uniq_authors([{"name": n, "profile": None} for n in names])
 
 
+def _authors_from_bs4(html: str, base_url: str) -> List[Dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    candidates = []
+    for a in soup.select("a[href*='/en/persons/']"):
+        href = a.get("href") or ""
+        name = a.get_text(strip=True)
+        if not _is_person_profile_url(href):
+            continue
+        if not _looks_like_person_name(name):
+            continue
+        candidates.append({"name": name, "profile": urljoin(base_url, href)})
+    return _uniq_authors(candidates)
+
+
+def _abstract_from_bs4(html: str) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in [
+        "section#abstract .textblock",
+        "div#abstract .textblock",
+        "[data-section='abstract'] .textblock",
+        ".abstract .textblock",
+    ]:
+        el = soup.select_one(sel)
+        if el:
+            txt = el.get_text(" ", strip=True)
+            if len(txt) > 30:
+                return txt
+    return ""
+
+
 def extract_detail_for_link(driver, link: str, title_hint: str) -> Dict:
     """Extract publication details with Cloudflare handling"""
     safe_get(driver, link, "detail")
@@ -741,6 +845,11 @@ def extract_detail_for_link(driver, link: str, title_hint: str) -> Dict:
             names = _get_meta_list(driver, ["citation_author"])
             author_objs = _wrap_names_as_objs(names)
         except:
+            pass
+    if not author_objs:
+        try:
+            author_objs = _authors_from_bs4(driver.page_source, driver.current_url)
+        except Exception:
             pass
 
     # FAST DATE EXTRACTION with fallback
@@ -835,6 +944,11 @@ def extract_detail_for_link(driver, link: str, title_hint: str) -> Dict:
                     continue
         except:
             pass
+    if not abstract_txt:
+        try:
+            abstract_txt = _abstract_from_bs4(driver.page_source)
+        except Exception:
+            pass
 
     return {
         "title": title,
@@ -896,7 +1010,7 @@ def chunk(items: List[Dict], n: int) -> List[List[Dict]]:
 
 # =========================== Orchestrator ===========================
 def main():
-    global PORTAL_ROOT, BASE_URL, RETRIES, RETRY_DELAY, SCREENSHOT_DIR, DEBUG_CAPTURE
+    global PORTAL_ROOT, BASE_URL, RETRIES, RETRY_DELAY, CRAWL_DELAY, SCREENSHOT_DIR, DEBUG_CAPTURE
     
     ap = argparse.ArgumentParser(
         description="Cloudflare-resistant Coventry PurePortal scraper with undetected-chromedriver"
@@ -946,6 +1060,12 @@ def main():
         help="Base delay between retries in seconds (env: CRAWLER_RETRY_DELAY)",
     )
     ap.add_argument(
+        "--crawl-delay",
+        type=float,
+        default=CRAWL_DELAY,
+        help="Polite crawl delay between requests (env: CRAWLER_DELAY)",
+    )
+    ap.add_argument(
         "--screenshot-dir",
         default=None,
         help="Save screenshots/HTML on failures to this directory (useful for debugging)",
@@ -959,6 +1079,11 @@ def main():
         "--use-regular-selenium",
         action="store_true",
         help="Force use of regular Selenium instead of undetected-chromedriver (for Mac compatibility)",
+    )
+    ap.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        help="Rebuild inverted index after crawling",
     )
     
     args = ap.parse_args()
@@ -974,6 +1099,7 @@ def main():
     BASE_URL = args.base_url
     RETRIES = max(0, args.retries)
     RETRY_DELAY = max(0.1, args.retry_delay)
+    CRAWL_DELAY = max(0.0, args.crawl_delay)
     SCREENSHOT_DIR = args.screenshot_dir
     DEBUG_CAPTURE = args.debug_capture
     
@@ -1092,201 +1218,30 @@ def main():
     print(f"Success rate: {success_rate:.1f}% ({successful}/{len(final_rows)} with data)")
     
     print(f"\n[DONE] ✓ Saved {len(final_rows)} records → {out_path}")
+
+    if args.rebuild_index:
+        indexer_path = Path(__file__).resolve().parents[1] / "backend" / "indexer.py"
+        if indexer_path.exists():
+            print("[INDEX] Rebuilding inverted index...")
+            try:
+                subprocess.run(
+                    [
+                        sys.executable,
+                        str(indexer_path),
+                        "--data-dir",
+                        str(outdir),
+                    ],
+                    check=False,
+                )
+            except Exception as e:
+                print(f"[INDEX] Failed to rebuild index: {e}")
+        else:
+            print("[INDEX] indexer.py not found; skipping index rebuild.")
     print(f"{'='*60}\n")
 
 
 if __name__ == "__main__":
     main()
-
-# #!/usr/bin/env python3
-# # -*- coding: utf-8 -*-
-
-# import argparse, json, os, time, re, unicodedata, random
-# from math import ceil
-# from pathlib import Path
-# from typing import List, Dict, Optional, Tuple
-# from urllib.parse import urljoin, urlparse, quote
-
-# # Undetected Chrome Driver
-# try:
-#     import undetected_chromedriver as uc
-#     USE_UNDETECTED = True
-# except ImportError:
-#     print("[WARNING] undetected-chromedriver not installed. Install with: pip install undetected-chromedriver")
-#     print("[WARNING] Falling back to regular Selenium (may fail with Cloudflare)")
-#     USE_UNDETECTED = False
-
-# # Selenium - always import these
-# from selenium import webdriver
-# from selenium.webdriver.chrome.service import Service as ChromeService
-# from selenium.webdriver.chrome.options import Options
-# from webdriver_manager.chrome import ChromeDriverManager
-
-# # Selenium Stealth
-# try:
-#     from selenium_stealth import stealth
-#     USE_STEALTH = True
-#     print("[INFO] selenium-stealth is available")
-# except ImportError:
-#     USE_STEALTH = False
-#     print("[WARNING] selenium-stealth not installed. Install with: pip install selenium-stealth")
-# from selenium.webdriver.common.by import By
-# from selenium.common.exceptions import (
-#     TimeoutException,
-#     NoSuchElementException,
-#     WebDriverException,
-# )
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
-
-# # Parallelism
-# from concurrent.futures import ThreadPoolExecutor, as_completed
-
-# # ---------- Config ----------
-# DEFAULT_PORTAL_ROOT = os.getenv("PORTAL_ROOT", "https://pureportal.coventry.ac.uk")
-# DEFAULT_BASE_URL = os.getenv(
-#     "BASE_URL",
-#     f"{DEFAULT_PORTAL_ROOT}/en/organisations/fbl-school-of-economics-finance-and-accounting/publications/",
-# )
-# PORTAL_ROOT = DEFAULT_PORTAL_ROOT
-# PERSONS_PREFIX = "/en/persons/"
-# BASE_URL = DEFAULT_BASE_URL
-# RETRIES = int(os.getenv("CRAWLER_RETRIES", "3"))
-# RETRY_DELAY = float(os.getenv("CRAWLER_RETRY_DELAY", "2.5"))
-# SCREENSHOT_DIR = None
-# DEBUG_CAPTURE = False
-
-
-# # =========================== Chrome helpers ===========================
-# def build_chrome_options_stealth(headless: bool, legacy_headless: bool = False):
-#     """Build Chrome options with enhanced stealth features"""
-#     if USE_UNDETECTED:
-#         options = uc.ChromeOptions()
-#     else:
-#         options = Options()
-    
-#     if headless:
-#         if legacy_headless:
-#             options.add_argument("--headless")
-#         else:
-#             options.add_argument("--headless=new")
-    
-#     # Realistic window size
-#     options.add_argument("--window-size=1920,1080")
-#     options.add_argument("--start-maximized")
-    
-#     # Anti-detection arguments
-#     options.add_argument("--disable-blink-features=AutomationControlled")
-#     options.add_argument("--disable-dev-shm-usage")
-#     options.add_argument("--no-sandbox")
-#     options.add_argument("--disable-gpu")
-#     options.add_argument("--disable-notifications")
-#     options.add_argument("--disable-popup-blocking")
-    
-#     # Updated user agent (Chrome 131)
-#     options.add_argument(
-#         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-#         "AppleWebKit/537.36 (KHTML, like Gecko) "
-#         "Chrome/131.0.0.0 Safari/537.36"
-#     )
-    
-#     # Preferences to appear more human
-#     prefs = {
-#         "profile.default_content_setting_values": {
-#             "notifications": 2,
-#             "geolocation": 2,
-#         },
-#         "credentials_enable_service": False,
-#         "profile.password_manager_enabled": False,
-#     }
-#     options.add_experimental_option("prefs", prefs)
-#     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-#     options.add_experimental_option("useAutomationExtension", False)
-    
-#     # Performance optimizations
-#     options.page_load_strategy = "normal"  # Changed from "eager" for better Cloudflare handling
-    
-#     return options
-
-
-# def make_driver(headless: bool, legacy_headless: bool = False):
-#     """Create a stealth web driver"""
-#     if USE_UNDETECTED:
-#         # Undetected ChromeDriver - best for bypassing Cloudflare
-#         options = build_chrome_options_stealth(headless, legacy_headless)
-        
-#         # Fix for Apple Silicon Macs
-#         import platform
-#         use_subprocess = False
-#         if platform.system() == 'Darwin' and platform.machine() == 'arm64':
-#             print("[INFO] Detected Apple Silicon Mac - using subprocess mode")
-#             use_subprocess = True
-        
-#         try:
-#             driver = uc.Chrome(
-#                 options=options,
-#                 version_main=None,  # Auto-detect Chrome version
-#                 driver_executable_path=None,
-#                 headless=headless,
-#                 use_subprocess=use_subprocess
-#             )
-#         except Exception as e:
-#             if "Bad CPU type" in str(e) or "arm64" in str(e):
-#                 print(f"[WARNING] undetected-chromedriver failed on Apple Silicon: {e}")
-#                 print("[INFO] Falling back to regular Selenium...")
-#                 # Fall back to regular Selenium
-#                 service = ChromeService(ChromeDriverManager().install(), log_output=os.devnull)
-#                 options = build_chrome_options_stealth(headless, legacy_headless)
-#                 driver = webdriver.Chrome(service=service, options=options)
-#             else:
-#                 raise
-#     else:
-#         # Regular Selenium with stealth enhancements
-#         service = ChromeService(ChromeDriverManager().install(), log_output=os.devnull)
-#         options = build_chrome_options_stealth(headless, legacy_headless)
-#         driver = webdriver.Chrome(service=service, options=options)
-    
-#     # Set timeouts
-#     driver.set_page_load_timeout(30)
-#     driver.implicitly_wait(1)
-    
-#     # Apply selenium-stealth if available
-#     if USE_STEALTH and not USE_UNDETECTED:
-#         print("[STEALTH] Applying selenium-stealth patches...")
-#         stealth(driver,
-#                 languages=["en-US", "en"],
-#                 vendor="Google Inc.",
-#                 platform="Win32",
-#                 webgl_vendor="Intel Inc.",
-#                 renderer="Intel Iris OpenGL Engine",
-#                 fix_hairline=True,
-#         )
-    
-#     # Inject anti-detection JavaScript
-#     try:
-#         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-#             "source": """
-#                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-#                 Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-#                 Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-#                 Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
-#                 window.chrome = {runtime: {}, loadTimes: function() {}, csi: function() {}};
-#                 Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
-#                 Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
-                
-#                 // Spoof permissions
-#                 const originalQuery = window.navigator.permissions.query;
-#                 window.navigator.permissions.query = (parameters) => (
-#                     parameters.name === 'notifications' ?
-#                         Promise.resolve({ state: Notification.permission }) :
-#                         originalQuery(parameters)
-#                 );
-#             """
-#         })
-#     except Exception:
-#         pass
-    
-#     return driver
 
 
 # def _maybe_screenshot(driver, label: str):

@@ -1,5 +1,5 @@
 selenium
 webdriver-manager
 APScheduler
-playwright
 requests
+beautifulsoup4
