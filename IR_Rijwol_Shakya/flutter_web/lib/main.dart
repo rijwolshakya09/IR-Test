@@ -366,128 +366,167 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          const _WebBackground(),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= 1100;
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 28,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(context, isWide),
-                      const SizedBox(height: 28),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 900),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) => Opacity(
-                          opacity: value,
-                          child: Transform.translate(
-                            offset: Offset(0, 24 * (1 - value)),
-                            child: child,
-                          ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        body: Stack(
+          children: [
+            const _WebBackground(),
+            SafeArea(
+              child: Column(
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 1100;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
                         ),
-                        child: isWide
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: _buildSearchPanel(context),
+                        child: _buildHeader(context, isWide),
+                      );
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final maxWidth = math.min(constraints.maxWidth, 420.0);
+                        return Align(
+                          alignment: Alignment.center,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxWidth),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.85),
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                    Border.all(color: const Color(0xFFE7E2D8)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 8),
                                   ),
-                                  const SizedBox(width: 24),
-                                  Expanded(
-                                    flex: 2,
-                                    child: _buildInsightPanel(context),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                children: [
-                                  _buildSearchPanel(context),
-                                  const SizedBox(height: 24),
-                                  _buildInsightPanel(context),
                                 ],
                               ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, bool isWide) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE7E2D8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 30,
-            offset: const Offset(0, 20),
-          ),
-        ],
-      ),
-      child: Flex(
-        direction: isWide ? Axis.horizontal : Axis.vertical,
-        crossAxisAlignment:
-            isWide ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (isWide)
-            const Expanded(
-              child: _HeaderBody(),
-            )
-          else
-            const _HeaderBody(),
-          if (isWide) const SizedBox(width: 24),
-          if (isWide)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 16,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B3B49),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Today\'s focus',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: Colors.white70,
+                              child: const TabBar(
+                                indicator: BoxDecoration(
+                                  color: Color(0xFF0B3B49),
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(12)),
+                                ),
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                indicatorPadding: EdgeInsets.zero,
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Color(0xFF4B5563),
+                                labelStyle:
+                                    TextStyle(fontWeight: FontWeight.w600),
+                                tabs: [
+                                  Tab(text: 'Search'),
+                                  Tab(text: 'Classify'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Find signal in literature noise.',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildSearchScreen(context),
+                        _buildClassificationScreen(context),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, bool isWide) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7E2D8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 16),
+          ),
         ],
+      ),
+      child: _HeaderBody(isWide: isWide),
+    );
+  }
+
+  Widget _buildSearchScreen(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 24 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = math.min(constraints.maxWidth, 1100.0);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 6),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: _buildSearchPanel(context),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildClassificationScreen(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 24 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = math.min(constraints.maxWidth, 900.0);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 6),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: _buildInsightPanel(context),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -915,49 +954,7 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _SectionCard(
-          title: 'Assignment checklist',
-          subtitle: 'PurePortal-focused compliance overview.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              _ChecklistItem(label: 'Crawler targets PurePortal ICS publications'),
-              _ChecklistItem(label: 'Extracts title, authors, date, abstract, profiles'),
-              _ChecklistItem(label: 'Polite crawling (robots.txt + delays)'),
-              _ChecklistItem(label: 'Inverted index built after crawl'),
-              _ChecklistItem(label: 'Search + classification APIs available'),
-            ],
-          ),
-        ),
       ],
-    );
-  }
-}
-
-class _ChecklistItem extends StatelessWidget {
-  const _ChecklistItem({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: Color(0xFF0B3B49), size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF334155),
-                  ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -974,18 +971,23 @@ String _prettyModelName(String model) {
 }
 
 class _HeaderBody extends StatelessWidget {
-  const _HeaderBody();
+  const _HeaderBody({required this.isWide});
+
+  final bool isWide;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final titleStyle = theme.textTheme.displayLarge?.copyWith(
+      fontSize: isWide ? 36 : 26,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(isWide ? 8 : 6),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
@@ -993,41 +995,16 @@ class _HeaderBody extends StatelessWidget {
               ),
               child: SvgPicture.asset(
                 'assets/logo/transparent-logo.svg',
-                height: 38,
-                width: 38,
+                height: isWide ? 34 : 26,
+                width: isWide ? 34 : 26,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'IR Rijwol Shakya',
-                style: theme.textTheme.displayLarge,
+                style: titleStyle,
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Search, track, and classify research publications with a '
-          'web-first workspace.',
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: const Color(0xFF4B5563),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: const [
-            _InfoPill(
-              label: 'API Base',
-              value: kApiBaseUrl,
-              icon: Icons.link_rounded,
-            ),
-            _InfoPill(
-              label: 'Dataset',
-              value: 'Publications + training data',
-              icon: Icons.bookmark_added_outlined,
             ),
           ],
         ),
