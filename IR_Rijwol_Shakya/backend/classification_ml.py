@@ -61,7 +61,7 @@ class DocumentClassificationSystem:
                     if row.get("category"):
                         categories.append(row["category"].strip())
         except FileNotFoundError:
-            categories = ["politics", "business", "health"]
+            categories = ["business", "entertainment", "health"]
         return categories
 
     def _load_training_documents(self) -> List[Dict]:
@@ -79,15 +79,39 @@ class DocumentClassificationSystem:
     def _get_fallback_training_documents(self) -> List[Dict]:
         return [
             {
-                "text": "Government passes new policy on public health spending.",
-                "category": "politics",
-            },
-            {
                 "text": "Company reports record revenue and higher profit margins.",
                 "category": "business",
             },
             {
+                "text": "Startup secures new funding round to expand market operations.",
+                "category": "business",
+            },
+            {
+                "text": "Stock market volatility impacts investor confidence this quarter.",
+                "category": "business",
+            },
+            {
+                "text": "The new film premiere draws large crowds and critical acclaim.",
+                "category": "entertainment",
+            },
+            {
+                "text": "Music festival lineup includes award-winning international artists.",
+                "category": "entertainment",
+            },
+            {
+                "text": "Streaming series finale boosts subscription numbers worldwide.",
+                "category": "entertainment",
+            },
+            {
                 "text": "Researchers discover a new treatment for chronic disease.",
+                "category": "health",
+            },
+            {
+                "text": "Hospitals adopt improved surgical protocols to reduce recovery time.",
+                "category": "health",
+            },
+            {
+                "text": "Public health study links exercise to lower cardiovascular risk.",
                 "category": "health",
             },
         ]

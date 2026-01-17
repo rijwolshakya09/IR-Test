@@ -1,0 +1,128 @@
+{
+  "naive_bayes": {
+    "training_size": 3200,
+    "test_size": 800,
+    "test_size_ratio": 0.2,
+    "accuracy": 1.0,
+    "classification_report": {
+      "business": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 267.0
+      },
+      "entertainment": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 267.0
+      },
+      "health": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 266.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 800.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 800.0
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "business",
+        "entertainment",
+        "health"
+      ],
+      "matrix": [
+        [
+          267,
+          0,
+          0
+        ],
+        [
+          0,
+          267,
+          0
+        ],
+        [
+          0,
+          0,
+          266
+        ]
+      ]
+    }
+  },
+  "logistic_regression": {
+    "training_size": 3200,
+    "test_size": 800,
+    "test_size_ratio": 0.2,
+    "accuracy": 1.0,
+    "classification_report": {
+      "business": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 267.0
+      },
+      "entertainment": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 267.0
+      },
+      "health": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 266.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 800.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 800.0
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "business",
+        "entertainment",
+        "health"
+      ],
+      "matrix": [
+        [
+          267,
+          0,
+          0
+        ],
+        [
+          0,
+          267,
+          0
+        ],
+        [
+          0,
+          0,
+          266
+        ]
+      ]
+    }
+  }
+}
