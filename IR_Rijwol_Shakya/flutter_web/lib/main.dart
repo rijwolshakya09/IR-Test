@@ -387,54 +387,6 @@ class _HomePageState extends State<HomePage> {
                       );
                     },
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final maxWidth = math.min(constraints.maxWidth, 420.0);
-                        return Align(
-                          alignment: Alignment.center,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: maxWidth),
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(14),
-                                border:
-                                    Border.all(color: const Color(0xFFE7E2D8)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: const TabBar(
-                                indicator: BoxDecoration(
-                                  color: Color(0xFF0B3B49),
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12)),
-                                ),
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                indicatorPadding: EdgeInsets.zero,
-                                labelColor: Colors.white,
-                                unselectedLabelColor: Color(0xFF4B5563),
-                                labelStyle:
-                                    TextStyle(fontWeight: FontWeight.w600),
-                                tabs: [
-                                  Tab(text: 'Search'),
-                                  Tab(text: 'Classify'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   Expanded(
                     child: TabBarView(
                       children: [
@@ -467,7 +419,31 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      child: _HeaderBody(isWide: isWide),
+      child: isWide
+          ? const Stack(
+              alignment: Alignment.center,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: _HeaderBody(isWide: true)),
+                    SizedBox(width: 16),
+                    _HeaderTabBar(),
+                  ],
+                ),
+                _HeaderLogoRow(),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _HeaderBody(isWide: isWide),
+                const SizedBox(height: 10),
+                const _HeaderLogoRow(),
+                const SizedBox(height: 10),
+                const _HeaderTabBar(),
+              ],
+            ),
     );
   }
 
@@ -567,8 +543,8 @@ class _HomePageState extends State<HomePage> {
                             onPressed:
                                 _searchLoading ? null : () => _runSearch(),
                             icon: const Icon(Icons.search_rounded),
-                            label:
-                                Text(_searchLoading ? 'Searching...' : 'Search'),
+                            label: Text(
+                                _searchLoading ? 'Searching...' : 'Search'),
                           ),
                         ),
                       ],
@@ -671,7 +647,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tip: try broad queries (e.g., \"machine learning\") and then '
+              'Tip: try broad queries (e.g., "machine learning") and then '
               'refine.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF6B7280),
@@ -736,7 +712,7 @@ class _HomePageState extends State<HomePage> {
       onSubmitted: (_) => _runSearch(page: 1),
     );
     final sortField = DropdownButtonFormField<String>(
-      value: _sortBy,
+      initialValue: _sortBy,
       decoration: inputDecoration.copyWith(
         labelText: 'Sort by',
         prefixIcon: const Icon(Icons.sort),
@@ -804,9 +780,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildInsightPanel(BuildContext context) {
-    return Column(
-      children: [
-        _SectionCard(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 860;
+        final classifyCard = _SectionCard(
           title: 'Classify text',
           subtitle: 'Predict categories with the IR classifier.',
           child: LayoutBuilder(
@@ -833,7 +810,7 @@ class _HomePageState extends State<HomePage> {
                     Column(
                       children: [
                         DropdownButtonFormField<String>(
-                          value: _selectedModel,
+                          initialValue: _selectedModel,
                           decoration: InputDecoration(
                             labelText: 'Model',
                             border: OutlineInputBorder(
@@ -863,9 +840,8 @@ class _HomePageState extends State<HomePage> {
                             onPressed:
                                 _classifyLoading ? null : _runClassification,
                             icon: const Icon(Icons.auto_awesome_rounded),
-                            label: Text(_classifyLoading
-                                ? 'Analyzing...'
-                                : 'Classify'),
+                            label: Text(
+                                _classifyLoading ? 'Analyzing...' : 'Classify'),
                           ),
                         ),
                       ],
@@ -875,7 +851,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedModel,
+                            initialValue: _selectedModel,
                             decoration: InputDecoration(
                               labelText: 'Model',
                               border: OutlineInputBorder(
@@ -915,15 +891,15 @@ class _HomePageState extends State<HomePage> {
                   if (_classificationResult != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
-                      child: _ClassificationCard(result: _classificationResult!),
+                      child:
+                          _ClassificationCard(result: _classificationResult!),
                     ),
                 ],
               );
             },
           ),
-        ),
-        const SizedBox(height: 16),
-        _SectionCard(
+        );
+        final modelCard = _SectionCard(
           title: 'Model status',
           subtitle: 'Check training readiness and categories.',
           child: Column(
@@ -947,14 +923,31 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
               if (_modelLoading && _modelInfo == null)
                 const LinearProgressIndicator(),
-              if (_modelError != null)
-                _InlineAlert(message: _modelError!),
-              if (_modelInfo != null)
-                _ModelInfoCard(info: _modelInfo!),
+              if (_modelError != null) _InlineAlert(message: _modelError!),
+              if (_modelInfo != null) _ModelInfoCard(info: _modelInfo!),
             ],
           ),
-        ),
-      ],
+        );
+
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: classifyCard),
+              const SizedBox(width: 16),
+              Expanded(child: modelCard),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            classifyCard,
+            const SizedBox(height: 16),
+            modelCard,
+          ],
+        );
+      },
     );
   }
 }
@@ -1009,6 +1002,71 @@ class _HeaderBody extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _HeaderTabBar extends StatelessWidget {
+  const _HeaderTabBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = math.min(constraints.maxWidth, 360.0);
+        return Align(
+          alignment: Alignment.centerRight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE7E2D8)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const TabBar(
+                indicator: BoxDecoration(
+                  color: Color(0xFF0B3B49),
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: EdgeInsets.zero,
+                labelColor: Colors.white,
+                unselectedLabelColor: Color(0xFF4B5563),
+                labelStyle: TextStyle(fontWeight: FontWeight.w600),
+                tabs: [
+                  Tab(text: 'Search'),
+                  Tab(text: 'Classify'),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HeaderLogoRow extends StatelessWidget {
+  const _HeaderLogoRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.center,
+      child: Image.asset(
+        'assets/softwarica.png',
+        height: 50,
+        fit: BoxFit.contain,
+      ),
     );
   }
 }
@@ -1299,7 +1357,7 @@ class _ResultCardState extends State<_ResultCard> {
   List<String> _queryTokens(String query) {
     return query
         .toLowerCase()
-        .split(RegExp(r"\s+"))
+        .split(RegExp(r'\s+'))
         .where((t) => t.length > 1)
         .toSet()
         .toList();
@@ -1355,9 +1413,8 @@ class _ResultCardState extends State<_ResultCard> {
   @override
   Widget build(BuildContext context) {
     final publication = widget.publication;
-    final profileAuthors = publication.authors
-        .where((a) => (a.profile ?? '').isNotEmpty)
-        .toList();
+    final profileAuthors =
+        publication.authors.where((a) => (a.profile ?? '').isNotEmpty).toList();
     final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
           color: const Color(0xFF0F172A),
           height: 1.3,
