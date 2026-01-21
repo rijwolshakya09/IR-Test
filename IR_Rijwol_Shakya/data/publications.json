@@ -2352,10 +2352,6 @@
         "profile": "https://pureportal.coventry.ac.uk/en/persons/alison-halford/"
       },
       {
-        "name": "Jonathan Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
-      {
         "name": "Elena Gaura",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/elena-gaura/"
       }
@@ -2427,10 +2423,6 @@
     "title": "A community energy management system for smart microgrids",
     "link": "https://pureportal.coventry.ac.uk/en/publications/a-community-energy-management-system-for-smart-microgrids/",
     "authors": [
-      {
-        "name": "Jonathan Daniel Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
       {
         "name": "Elena Gaura",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/elena-gaura/"
@@ -3266,10 +3258,6 @@
       {
         "name": "James Brusey",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/james-brusey/"
-      },
-      {
-        "name": "Jonathan Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
       }
     ],
     "published_date": "22 Apr 2022",
@@ -3692,10 +3680,6 @@
     "link": "https://pureportal.coventry.ac.uk/en/publications/using-multi-objective-optimisation-with-adm1-and-measured-data-to/",
     "authors": [
       {
-        "name": "J.D. Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
-      {
         "name": "J. Brusey",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/james-brusey/"
       }
@@ -3823,10 +3807,6 @@
     "title": "Analysis of standalone solar streetlights for improved energy access in displaced settlements",
     "link": "https://pureportal.coventry.ac.uk/en/publications/analysis-of-standalone-solar-streetlights-for-improved-energy-acc/",
     "authors": [
-      {
-        "name": "Jonathan Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
       {
         "name": "Alison Halford",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/alison-halford/"
@@ -4596,10 +4576,6 @@
     "link": "https://pureportal.coventry.ac.uk/en/publications/optimising-feedstock-flowrate-to-improve-the-performance-of-an-ex/",
     "authors": [
       {
-        "name": "Jonathan Daniel Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
-      {
         "name": "James Brusey",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/james-brusey/"
       }
@@ -4815,10 +4791,6 @@
     "title": "The challenges of community-based solar energy interventions: Lessons from two Rwandan Refugee Camps",
     "link": "https://pureportal.coventry.ac.uk/en/publications/the-challenges-of-community-based-solar-energy-interventions-less/",
     "authors": [
-      {
-        "name": "Jonathan Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
       {
         "name": "Alison Halford",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/alison-halford/"
@@ -5054,10 +5026,6 @@
       {
         "name": "Vasile Palade",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/vasile-palade/"
-      },
-      {
-        "name": "Michael E. Fitzpatrick",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/michael-fitzpatrick/"
       }
     ],
     "published_date": "3 Sept 2021",
@@ -6440,10 +6408,6 @@
     "link": "https://pureportal.coventry.ac.uk/en/publications/remote-sensing-technologies-and-energy-applications-in-refugee-ca/",
     "authors": [
       {
-        "name": "Jonathan Daniel Nixon",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/jonathan-nixon/"
-      },
-      {
         "name": "Elena Gaura",
         "profile": "https://pureportal.coventry.ac.uk/en/persons/elena-gaura/"
       }
@@ -6456,8 +6420,16 @@
     "link": "https://pureportal.coventry.ac.uk/en/publications/spontaneous-fruit-fly-optimisation-for-truss-weight-minimisation-/",
     "authors": [
       {
+        "name": "Uche Onyekpe",
+        "profile": null
+      },
+      {
+        "name": "Stratis Kanarachos",
+        "profile": null
+      },
+      {
         "name": "Michael E. Fitzpatrick",
-        "profile": "https://pureportal.coventry.ac.uk/en/persons/michael-fitzpatrick/"
+        "profile": null
       }
     ],
     "published_date": "24 Sept 2019",

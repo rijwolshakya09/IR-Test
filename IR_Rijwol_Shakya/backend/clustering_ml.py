@@ -99,7 +99,7 @@ class DocumentClusteringSystem:
             label_counts[cluster_id][doc["category"]] += 1
 
         self.cluster_label_map = {
-            cluster_id: counts.most_common(1)[0][0] if counts else "unknown"
+            int(cluster_id): counts.most_common(1)[0][0] if counts else "unknown"
             for cluster_id, counts in label_counts.items()
         }
 
@@ -139,7 +139,9 @@ class DocumentClusteringSystem:
             "clusters": self.n_clusters,
             "total_documents": len(self.training_documents),
             "categories": self.categories,
-            "cluster_labels": self.cluster_label_map,
+            "cluster_labels": {
+                int(k): v for k, v in self.cluster_label_map.items()
+            },
         }
 
 
