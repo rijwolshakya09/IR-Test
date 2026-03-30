@@ -1,0 +1,101 @@
+IR_Rijwol_Shakya 10-minute walkthrough script
+
+[0:00 - 0:40] Intro
+Hi everyone. In this video I will walk through my IR_Rijwol_Shakya project. The goal is to crawl publications from Coventry PurePortal, build a searchable index, and provide a web interface to search and classify text. I will explain the crawler and scheduler, then the FastAPI backend, and finally the Flutter web UI with a live demo of search and classification.
+
+[0:40 - 2:45] Crawler overview (crawler/crawler.py)
+The crawler is in `IR_Rijwol_Shakya/crawler/crawler.py`. It is a two-stage pipeline:
+1) Stage 1 collects publication links from the Coventry PurePortal listing pages.
+2) Stage 2 visits each publication page and extracts details like title, authors, published date, and abstract.
+
+The crawler is designed to be polite and resilient. It reads robots.txt using Python’s `robotparser`, and `_respect_crawl_delay()` enforces both a global crawl delay and any crawl-delay from robots.txt. It also adds randomized waits to look more human and to reduce throttling.
+
+To deal with Cloudflare, the crawler can use `undetected-chromedriver` and optional `selenium-stealth`. The `safe_get()` function wraps requests with retries, random delays, and Cloudflare detection. If a challenge is detected, it attempts auto-clicking and prompts for manual verification if needed.
+
+Stage 1 uses `gather_all_listing_links()` to scrape list pages. It uses a single Selenium session to reuse cookies and reduce Cloudflare triggers. Each listing page is parsed with CSS selectors like `.result-container h3.title a` to collect title and link.
+
+Stage 2 uses `worker_detail_batch()` with a `ThreadPoolExecutor` to process details in parallel. The core extractor is `extract_detail_for_link()`:
+- It grabs the title from the page h1.
+- It expands author lists with `_maybe_expand_authors()`.
+- It extracts authors using multiple strategies: header anchors, subtitle parsing, meta tags, and a BeautifulSoup fallback.
+- It extracts the published date from `span.date` or `time` elements.
+- It extracts the abstract with multiple selectors and fallback strategies, including looking for headings with “Abstract” or meta tags.
+
+Results are saved to `data/publications_links.json` after stage 1 and to `data/publications.json` after stage 2. At the end, the crawler prints a performance summary and can optionally rebuild the inverted index using `backend/indexer.py`.
+
+[2:45 - 3:25] Scheduler (crawler/schedule_crawler.py)
+The scheduler is in `IR_Rijwol_Shakya/crawler/schedule_crawler.py` and uses APScheduler. It runs the crawler every Sunday at midnight. The script checks for the project’s venv Python and falls back to the system Python if needed. This makes weekly refreshes automatic without manual runs.
+
+[3:25 - 6:20] Backend (backend/main.py, search.py, classification_ml.py)
+The backend is a FastAPI service in `backend/main.py`. On startup it loads:
+- `publications.json` (or `publications_links.json` as fallback)
+- `inverted_index.json` if present
+
+Search is exposed at `GET /search`. The API supports query text, pagination, author filter, year range, and sort order. If query is blank, it returns all publications. Search uses a cache with TTL to speed repeated queries.
+
+Search logic is implemented in `backend/search.py`. If an inverted index exists, it performs TF-IDF-style scoring over the index with term frequency and inverse document frequency. If no index exists, it falls back to vectorizing the title, authors, and abstract with `TfidfVectorizer` and uses cosine similarity. Results are normalized to return title, link, authors, published_date, abstract, and score.
+
+Classification is in `backend/classification_ml.py`. There are two models: Naive Bayes and Logistic Regression. The pipeline is:
+- NLTK tokenization, stopword removal, and Porter stemming
+- TF-IDF vectorization with unigrams and bigrams
+- Training on `data/training_documents.csv` with labels from `data/categories.csv`
+
+If the input is too short or outside the vocabulary, the system falls back to a keyword-based score map for business, entertainment, and health. That way it still provides a reasonable guess and a helpful explanation. The API endpoints are:
+- `POST /classify` for classification
+- `GET /model-info` for model status and categories
+- `POST /train-models` to retrain models
+
+[6:20 - 8:40] Flutter web UI (flutter_web/lib)
+The Flutter web UI lives in `IR_Rijwol_Shakya/flutter_web`. In `lib/main.dart` there are two tabs: Search and Classify.
+
+Search tab:
+- Query input for title, author, or keywords
+- Filters for author name and year range
+- Sorting by relevance score, date, or title
+- Paginated results with score, author names, publication date, and abstract
+- “Open source” links to the original PurePortal page
+
+Classification tab:
+- Text area for input
+- Model selector (naive_bayes or logistic_regression)
+- Results show predicted category, confidence, and a probability breakdown
+- Model info card shows training status and available categories
+
+The Flutter app calls the FastAPI endpoints via `flutter_web/lib/api.dart` and uses `API_BASE_URL` so it can point to the local backend while running on web.
+
+[8:40 - 10:00] Demo flow
+Now I will run the backend and Flutter web app, then demonstrate search and classification.
+
+1) Start the backend:
+- `cd IR_Rijwol_Shakya/backend`
+- `uvicorn main:app --reload --host 0.0.0.0 --port 8000`
+
+2) Start Flutter web:
+- `cd IR_Rijwol_Shakya/flutter_web`
+- `flutter run -d chrome`
+
+3) Demo search:
+- Enter a keyword like “COVID-19” or “blockchain” to show ranked results with abstracts.
+- Filter by author, e.g. “Vasile Palade”, to show author-specific results.
+- Use year filter, e.g. 2024 to 2025, to show recent items.
+
+4) Demo classification:
+- Paste a business sentence (earnings, revenue, merger) and show the predicted category.
+- Paste an entertainment sentence (film, streaming, awards) and show the predicted category.
+- Paste a health sentence (hospital, vaccine, clinical trial) and show the predicted category.
+
+That concludes the walkthrough of my IR_Rijwol_Shakya project: a crawler, a FastAPI backend with search and classification, and a Flutter web UI for interactive search and demo classification.
+
+
+Suggested demo search queries
+- Keywords: COVID-19, blockchain, cybersecurity, neural network, sensor, attack model
+- Author filter: Vasile Palade, Fei He, Abdorasoul Ghasemi
+- Year filter example: year_from = 2024, year_to = 2025
+
+Suggested classification prompts (strong signals)
+- Business: "Quarterly earnings report shows revenue growth and merger synergy targets."
+- Business: "The startup secured new funding and expanded its market operations."
+- Entertainment: "The film festival premiered award-winning movies and streaming series."
+- Entertainment: "The concert tour and music awards boosted streaming numbers."
+- Health: "The hospital launched a vaccine trial and improved patient care protocols."
+- Health: "Public health researchers reported new treatment outcomes and clinical trials."

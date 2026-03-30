@@ -712,7 +712,7 @@ class _HomePageState extends State<HomePage> {
       onSubmitted: (_) => _runSearch(page: 1),
     );
     final sortField = DropdownButtonFormField<String>(
-      initialValue: _sortBy,
+      value: _sortBy,
       decoration: inputDecoration.copyWith(
         labelText: 'Sort by',
         prefixIcon: const Icon(Icons.sort),
@@ -810,7 +810,7 @@ class _HomePageState extends State<HomePage> {
                     Column(
                       children: [
                         DropdownButtonFormField<String>(
-                          initialValue: _selectedModel,
+                          value: _selectedModel,
                           decoration: InputDecoration(
                             labelText: 'Model',
                             border: OutlineInputBorder(
@@ -851,7 +851,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: _selectedModel,
+                            value: _selectedModel,
                             decoration: InputDecoration(
                               labelText: 'Model',
                               border: OutlineInputBorder(
